@@ -75,7 +75,7 @@ class TwilioNotificationAgent extends AbstractEventNotificationAgent {
       from,
       preference.address,
       message
-    )
+    ).execute().body()
   }
 
   @Override

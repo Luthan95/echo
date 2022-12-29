@@ -56,7 +56,7 @@ class TwilioNotificationService implements NotificationService {
           from,
           it,
           body
-      )
+      ).e
     }
 
     new EchoResponse.Void()

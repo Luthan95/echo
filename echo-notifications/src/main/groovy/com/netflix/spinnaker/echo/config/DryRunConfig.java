@@ -16,26 +16,25 @@
 
 package com.netflix.spinnaker.echo.config;
 
-import static retrofit.Endpoints.newFixedEndpoint;
-
-import com.jakewharton.retrofit.Ok3Client;
 import com.netflix.spinnaker.config.DefaultServiceEndpoint;
 import com.netflix.spinnaker.config.okhttp3.OkHttpClientProvider;
 import com.netflix.spinnaker.echo.notification.DryRunNotificationAgent;
 import com.netflix.spinnaker.echo.pipelinetriggers.orca.OrcaService;
 import com.netflix.spinnaker.echo.services.Front50Service;
+import com.netflix.spinnaker.retrofit.RetrofitResponseInterceptor;
 import com.netflix.spinnaker.retrofit.Slf4jRetrofitLogger;
 import java.util.List;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import retrofit.Endpoint;
-import retrofit.RestAdapter;
-import retrofit.converter.JacksonConverter;
+import retrofit2.Retrofit;
+import retrofit2.converter.jackson.JacksonConverterFactory;
 
 @Configuration
 @EnableConfigurationProperties(DryRunConfig.DryRunProperties.class)
@@ -43,31 +42,37 @@ import retrofit.converter.JacksonConverter;
 @Slf4j
 public class DryRunConfig {
 
-  @Bean
-  Endpoint dryRunEndpoint(DryRunProperties properties) {
-    return newFixedEndpoint(properties.getBaseUrl());
-  }
+  //  @Bean
+  //  Endpoint dryRunEndpoint(DryRunProperties properties) {
+  //    return newFixedEndpoint(properties.getBaseUrl());
+  //  }
 
   @Bean
   DryRunNotificationAgent dryRunNotificationAgent(
       Front50Service front50,
       OkHttpClientProvider clientProvider,
-      RestAdapter.LogLevel retrofitLogLevel,
-      Endpoint dryRunEndpoint,
+      HttpLoggingInterceptor.Level retrofitLogLevel,
       DryRunProperties properties) {
-    log.info("Pipeline dry runs will execute at {}", dryRunEndpoint.getUrl());
+    log.info("Pipeline dry runs will execute at {}", properties.getBaseUrl());
+
+    OkHttpClient orca1 =
+        clientProvider
+            .getClient(new DefaultServiceEndpoint("orca", properties.getBaseUrl()))
+            .newBuilder()
+            .addInterceptor(new RetrofitResponseInterceptor())
+            .addInterceptor(
+                new HttpLoggingInterceptor(new Slf4jRetrofitLogger(OrcaService.class))
+                    .setLevel(retrofitLogLevel))
+            .build();
+
     OrcaService orca =
-        new RestAdapter.Builder()
-            .setEndpoint(dryRunEndpoint)
-            .setConverter(new JacksonConverter())
-            .setClient(
-                new Ok3Client(
-                    clientProvider.getClient(
-                        new DefaultServiceEndpoint("orca", dryRunEndpoint.getUrl()))))
-            .setLogLevel(retrofitLogLevel)
-            .setLog(new Slf4jRetrofitLogger(OrcaService.class))
+        new Retrofit.Builder()
+            .baseUrl(properties.getBaseUrl())
+            .addConverterFactory(JacksonConverterFactory.create())
+            .client(orca1)
             .build()
             .create(OrcaService.class);
+
     return new DryRunNotificationAgent(front50, orca, properties);
   }
 

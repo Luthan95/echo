@@ -84,12 +84,12 @@ class BearychatNotificationAgent extends AbstractEventNotificationAgent {
         .replace("{{link}}", link ?: "")
     }
 
-    List<BearychatUserInfo> userList = bearychatService.getUserList(token)
+    List<BearychatUserInfo> userList = bearychatService.getUserList(token).execute().body()
     String userid = userList.find {it.email == preference.address}.id
-    CreateP2PChannelResponse channelInfo = bearychatService.createp2pchannel(token,new CreateP2PChannelPara(user_id: userid))
+    CreateP2PChannelResponse channelInfo = bearychatService.createp2pchannel(token,new CreateP2PChannelPara(user_id: userid)).execute().body()
     String channelId = channelInfo.vchannel_id
     bearychatService.sendMessage(token,new SendMessagePara(vchannel_id: channelId,
       text: message,
-      attachments: "" ))
+      attachments: "" )).execute()
   }
 }

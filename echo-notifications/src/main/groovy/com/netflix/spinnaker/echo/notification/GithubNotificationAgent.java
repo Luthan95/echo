@@ -31,11 +31,11 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.ResponseBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import retrofit.client.Response;
 
 @Slf4j
 @ConditionalOnProperty("github-status.enabled")
@@ -115,7 +115,16 @@ public class GithubNotificationAgent extends AbstractEventNotificationAgent {
     try {
       final String repo = content.getRepo();
       retrySupport.retry(
-          () -> githubService.updateCheck("token " + token, repo, branchCommit, githubStatus),
+          () -> {
+            try {
+              return githubService
+                  .updateCheck("token " + token, repo, branchCommit, githubStatus)
+                  .execute()
+                  .body();
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          },
           MAX_RETRY,
           RETRY_BACKOFF,
           false);
@@ -128,11 +137,11 @@ public class GithubNotificationAgent extends AbstractEventNotificationAgent {
   }
 
   private String getBranchCommit(String repo, String sha) {
-    Response response = githubService.getCommit("token " + token, repo, sha);
-    ObjectMapper objectMapper = EchoObjectMapper.getInstance();
     GithubCommit message = null;
     try {
-      message = objectMapper.readValue(response.getBody().in(), GithubCommit.class);
+      ResponseBody response = githubService.getCommit("token " + token, repo, sha).execute().body();
+      ObjectMapper objectMapper = EchoObjectMapper.getInstance();
+      message = objectMapper.readValue(response.byteStream(), GithubCommit.class);
     } catch (IOException e) {
       return sha;
     }

@@ -20,20 +20,20 @@ package com.netflix.spinnaker.echo.config
 import com.netflix.spinnaker.echo.slack.SlackAppService
 import com.netflix.spinnaker.echo.slack.SlackClient
 import com.netflix.spinnaker.echo.slack.SlackService
+import com.netflix.spinnaker.retrofit.RetrofitResponseInterceptor
 import com.netflix.spinnaker.retrofit.Slf4jRetrofitLogger
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import okhttp3.HttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import retrofit.Endpoint
-import retrofit.RestAdapter
-import retrofit.client.Client
-import retrofit.converter.JacksonConverter
-
-import static retrofit.Endpoints.newFixedEndpoint
+import retrofit2.Retrofit
+import retrofit2.converter.jackson.JacksonConverterFactory
 
 @Configuration
 @ConditionalOnProperty('slack.enabled')
@@ -51,20 +51,29 @@ class SlackConfig {
   @Bean
   @Qualifier("slackLegacyService")
   SlackService slackService(@Qualifier("slackLegacyConfig") SlackLegacyProperties config,
-                            Client retrofitClient,
-                            RestAdapter.LogLevel retrofitLogLevel) {
+                            OkHttpClient retrofitClient,
+                            HttpLoggingInterceptor.Level retrofitLogLevel) {
 
-    Endpoint slackEndpoint = newFixedEndpoint(config.baseUrl)
+//    Endpoint slackEndpoint = newFixedEndpoint(config.baseUrl)
     log.info("Using Slack {}: {}.", config.useIncomingWebhook ? "incoming webhook" : "chat api", config.baseUrl)
 
-    def slackClient = new RestAdapter.Builder()
-        .setEndpoint(slackEndpoint)
-        .setConverter(new JacksonConverter())
-        .setClient(retrofitClient)
-        .setLogLevel(retrofitLogLevel)
-        .setLog(new Slf4jRetrofitLogger(SlackClient.class))
-        .build()
-        .create(SlackClient.class)
+    def slackClient = new Retrofit.Builder()
+      .baseUrl(Objects.requireNonNull(HttpUrl.parse(config.baseUrl)))
+      .client(retrofitClient.newBuilder()
+        .addInterceptor(new RetrofitResponseInterceptor())
+        .addInterceptor(new HttpLoggingInterceptor(new Slf4jRetrofitLogger(SlackClient.class)).setLevel(retrofitLogLevel))
+        .build())
+      .addConverterFactory(JacksonConverterFactory.create())
+      .build().create(SlackClient.class);
+
+//    def slackClient = new RestAdapter.Builder()
+//        .setEndpoint(slackEndpoint)
+//        .setConverter(new JacksonConverter())
+//        .setClient(retrofitClient)
+//        .setLogLevel(retrofitLogLevel)
+//        .setLog(new Slf4jRetrofitLogger(SlackClient.class))
+//        .build()
+//        .create(SlackClient.class)
 
     log.info("Slack legacy service loaded")
     new SlackService(slackClient, config)
@@ -82,16 +91,26 @@ class SlackConfig {
   @Bean
   @Qualifier("slackAppService")
   SlackAppService slackAppService(@Qualifier("slackAppConfig") SlackAppProperties config,
-                                  Client retrofitClient,
-                                  RestAdapter.LogLevel retrofitLogLevel) {
-    def slackClient = new RestAdapter.Builder()
-      .setEndpoint(newFixedEndpoint(config.baseUrl))
-      .setClient(retrofitClient)
-      .setLogLevel(retrofitLogLevel)
-      .setLog(new Slf4jRetrofitLogger(SlackClient.class))
-      .setConverter(new JacksonConverter())
-      .build()
-      .create(SlackClient.class)
+                                  OkHttpClient retrofitClient,
+                                  HttpLoggingInterceptor.Level retrofitLogLevel) {
+
+    def slackClient = new Retrofit.Builder()
+      .baseUrl(Objects.requireNonNull(HttpUrl.parse(config.baseUrl)))
+      .client(retrofitClient.newBuilder()
+        .addInterceptor(new RetrofitResponseInterceptor())
+        .addInterceptor(new HttpLoggingInterceptor(new Slf4jRetrofitLogger(SlackClient.class)).setLevel(retrofitLogLevel))
+        .build())
+      .addConverterFactory(JacksonConverterFactory.create())
+      .build().create(SlackClient.class);
+
+//    def slackClient = new RestAdapter.Builder()
+//      .setEndpoint(newFixedEndpoint(config.baseUrl))
+//      .setClient(retrofitClient)
+//      .setLogLevel(retrofitLogLevel)
+//      .setLog(new Slf4jRetrofitLogger(SlackClient.class))
+//      .setConverter(new JacksonConverter())
+//      .build()
+//      .create(SlackClient.class)
 
     log.info("Slack app service loaded")
     new SlackAppService(slackClient, config)

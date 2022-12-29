@@ -188,7 +188,7 @@ public class PipelineCache implements MonitoredPoller {
 
   private List<Map<String, Object>> fetchRawPipelines() {
     List<Map<String, Object>> rawPipelines =
-        AuthenticatedRequest.allowAnonymous(() -> front50.getPipelines());
+        AuthenticatedRequest.allowAnonymous(() -> front50.getPipelines().execute().body());
     return (rawPipelines == null) ? Collections.emptyList() : rawPipelines;
   }
 
@@ -236,7 +236,7 @@ public class PipelineCache implements MonitoredPoller {
   // if anything fails during the refresh, we fall back to returning the cached version
   public Pipeline refresh(Pipeline cached) {
     try {
-      Map<String, Object> pipeline = front50.getPipeline(cached.getId());
+      Map<String, Object> pipeline = front50.getPipeline(cached.getId()).execute().body();
       Optional<Pipeline> processed = process(pipeline);
       if (!processed.isPresent()) {
         log.warn(
@@ -262,7 +262,7 @@ public class PipelineCache implements MonitoredPoller {
       Map<String, Object> pipeline, Predicate<Map<String, Object>> isV2Pipeline) {
     if (isV2Pipeline.test(pipeline)) {
       try {
-        return AuthenticatedRequest.allowAnonymous(() -> orca.v2Plan(pipeline));
+        return AuthenticatedRequest.allowAnonymous(() -> orca.v2Plan(pipeline).execute().body());
       } catch (Exception e) {
         // Don't fail the entire cache cycle if we fail a plan.
         log.error("Caught exception while planning templated pipeline: {}", pipeline, e);

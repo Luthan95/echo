@@ -71,7 +71,7 @@ class DryRunNotificationAgentSpec extends Specification {
 
   def "triggers a pipeline run for a pipeline:complete notification"() {
     given:
-    front50.getPipelines(application) >> [pipeline]
+    front50.getPipelines(application).execute().body() >> [pipeline]
 
     and:
     def captor = new BlockingVariable<Pipeline>()

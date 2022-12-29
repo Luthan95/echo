@@ -24,7 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
-import retrofit.client.Response
+import retrofit2.Response
 
 import static net.logstash.logback.argument.StructuredArguments.*
 import static org.apache.commons.lang3.text.WordUtils.capitalize
@@ -103,13 +103,13 @@ class SlackNotificationAgent extends AbstractEventNotificationAgent {
 
     Response response
     if (sendCompactMessages) {
-      response = slackService.sendCompactMessage(new CompactSlackMessage(body, color), address, true)
+      response = slackService.sendCompactMessage(new CompactSlackMessage(body, color), address, true);
     } else {
       String title = getNotificationTitle(config.type, application, status)
-      response = slackService.sendMessage(new SlackAttachment(title, body, color), address, true)
+      response = slackService.sendMessage(new SlackAttachment(title, body, color), address, true);
     }
     log.info("Received response from Slack: {} {} for execution id {}. {}",
-      response?.status, response?.reason, event.content?.execution?.id, response?.body)
+      response?.code(), response?.message(), event.content?.execution?.id, response?.body())
   }
 
   /**

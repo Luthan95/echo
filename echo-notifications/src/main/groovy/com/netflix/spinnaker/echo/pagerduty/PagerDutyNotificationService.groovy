@@ -22,6 +22,7 @@ import com.netflix.spinnaker.echo.api.Notification
 import com.netflix.spinnaker.echo.controller.EchoResponse
 import com.netflix.spinnaker.echo.notification.NotificationService
 import com.netflix.spinnaker.echo.services.Front50Service
+import com.netflix.spinnaker.retrofit.RetrofitException
 import groovy.transform.InheritConstructors
 import groovy.util.logging.Slf4j
 import org.springframework.beans.factory.annotation.Autowired
@@ -30,9 +31,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.bind.annotation.ResponseStatus
-import retrofit.RetrofitError
-import retrofit.mime.TypedByteArray
-import retrofit.mime.TypedInput
 
 import static net.logstash.logback.argument.StructuredArguments.kv
 
@@ -73,7 +71,7 @@ class PagerDutyNotificationService implements NotificationService {
             description: notification.additionalContext.message,
             details: notification.additionalContext.details as Map
           )
-        )
+        ).execute().body()
 
         if ("success".equals(response.status)) {
           // Page successful
@@ -82,12 +80,12 @@ class PagerDutyNotificationService implements NotificationService {
         } else {
           pdErrors.put(serviceKey, response.message)
         }
-      } catch (RetrofitError error) {
-        String errorMessage = error.response.reason
-        TypedInput responseBody = error.response.getBody()
+      } catch (RetrofitException error) {
+        String errorMessage = error.response.message()
+        def responseBody = error.response.errorBody()
         if (responseBody != null) {
           PagerDutyErrorResponseBody errorResponse = mapper.readValue(
-            new String(((TypedByteArray)responseBody).getBytes()),
+            new String(responseBody.bytes()),
             PagerDutyErrorResponseBody
           )
           if (errorResponse.errors && errorResponse.errors.size() > 0) {

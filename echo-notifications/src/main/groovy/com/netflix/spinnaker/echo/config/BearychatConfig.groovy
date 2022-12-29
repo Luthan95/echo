@@ -17,18 +17,20 @@
 package com.netflix.spinnaker.echo.config
 
 import com.netflix.spinnaker.echo.bearychat.BearychatService
+import com.netflix.spinnaker.echo.github.GithubService
+import com.netflix.spinnaker.retrofit.RetrofitResponseInterceptor
 import com.netflix.spinnaker.retrofit.Slf4jRetrofitLogger
-import retrofit.converter.JacksonConverter
+import okhttp3.HttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.jackson.JacksonConverterFactory
 
-import static retrofit.Endpoints.newFixedEndpoint
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import retrofit.Endpoint
-import retrofit.RestAdapter
-import retrofit.client.Client
 
 @Configuration
 @ConditionalOnProperty('bearychat.enabled')
@@ -37,23 +39,32 @@ import retrofit.client.Client
 class BearychatConfig {
 
   final static String BEARYCHAT_BASE_URL = 'https://api.bearychat.com'
-  @Bean
-  Endpoint bearychatEndpoint() {
-    String endpoint = BEARYCHAT_BASE_URL
-    newFixedEndpoint(endpoint)
-  }
+//  @Bean
+//  Endpoint bearychatEndpoint() {
+//    String endpoint = BEARYCHAT_BASE_URL
+//    newFixedEndpoint(endpoint)
+//  }
 
   @Bean
-  BearychatService bearychatService(Endpoint bearychatEndpoint, Client retrofitClient, RestAdapter.LogLevel retrofitLogLevel) {
+  BearychatService bearychatService(OkHttpClient retrofitClient, okhttp3.logging.HttpLoggingInterceptor.Level retrofitLogLevel) {
     log.info('bearchat service loaded')
 
-    new RestAdapter.Builder()
-      .setEndpoint(bearychatEndpoint)
-      .setConverter(new JacksonConverter())
-      .setClient(retrofitClient)
-      .setLogLevel(retrofitLogLevel)
-      .setLog(new Slf4jRetrofitLogger(BearychatService.class))
-      .build()
-      .create(BearychatService.class)
+    new Retrofit.Builder()
+      .baseUrl(Objects.requireNonNull(HttpUrl.parse(BEARYCHAT_BASE_URL)))
+      .client(retrofitClient.newBuilder()
+        .addInterceptor(new RetrofitResponseInterceptor())
+        .addInterceptor(new HttpLoggingInterceptor(new Slf4jRetrofitLogger(BearychatService.class)).setLevel(retrofitLogLevel))
+        .build())
+      .addConverterFactory(JacksonConverterFactory.create())
+      .build().create(BearychatService.class);
+
+//    new RestAdapter.Builder()
+//      .setEndpoint(bearychatEndpoint)
+//      .setConverter(new JacksonConverter())
+//      .setClient(retrofitClient)
+//      .setLogLevel(retrofitLogLevel)
+//      .setLog(new Slf4jRetrofitLogger(BearychatService.class))
+//      .build()
+//      .create(BearychatService.class)
   }
 }

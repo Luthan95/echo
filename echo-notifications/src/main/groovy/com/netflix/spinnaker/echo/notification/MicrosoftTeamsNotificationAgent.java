@@ -23,12 +23,11 @@ import com.netflix.spinnaker.echo.microsoftteams.api.MicrosoftTeamsSection;
 import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.Response;
 import org.apache.commons.lang3.text.WordUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import retrofit.client.Response;
-import retrofit.mime.TypedByteArray;
 
 @Slf4j
 @ConditionalOnProperty("microsoftteams.enabled")
@@ -145,9 +144,9 @@ public class MicrosoftTeamsNotificationAgent extends AbstractEventNotificationAg
 
     log.info(
         "Received response from Microsoft Teams Webhook  : {} {} for execution id {}. {}",
-        response.getStatus(),
-        response.getReason(),
+        response.code(),
+        response.message(),
         executionId,
-        new String(((TypedByteArray) response.getBody()).getBytes()));
+        new String(response.body().toString()));
   }
 }

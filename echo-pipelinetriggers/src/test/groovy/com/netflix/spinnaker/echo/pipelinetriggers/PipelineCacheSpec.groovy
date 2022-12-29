@@ -60,7 +60,7 @@ class PipelineCacheSpec extends Specification implements RetrofitStubs {
     def pipeline = Pipeline.builder().application('application').name('Pipeline').id('P1').build()
 
     def initialLoad = []
-    front50.getPipelines() >> initialLoad >> { throw unavailable() } >> [pipelineMap]
+    front50.getPipelines().execute().body() >> initialLoad >> { throw unavailable() } >> [pipelineMap]
     pipelineCache.start()
 
     expect: 'null pipelines when we have not polled yet'

@@ -48,7 +48,7 @@ class PipelineCountsDataProviderTest {
   @Test
   fun `basic pipeline counts`() {
 
-    every { front50Service.pipelines } returns listOf(
+    every { front50Service.pipelines.execute().body() } returns listOf(
       mapOf(
         "application" to "app1"
       ),
@@ -78,7 +78,7 @@ class PipelineCountsDataProviderTest {
   @Test
   fun `pipeline without application is ignored`() {
 
-    every { front50Service.pipelines } returns listOf(
+    every { front50Service.pipelines.execute().body() } returns listOf(
       mapOf(
         "application" to "app1"
       ),

@@ -29,6 +29,7 @@ import com.netflix.spinnaker.echo.services.Front50Service;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -50,6 +51,7 @@ public class DryRunNotificationAgent extends AbstractEventNotificationAgent {
     return "dryrun";
   }
 
+  @SneakyThrows
   @Override
   public void sendNotifications(
       Map<String, Object> preference,
@@ -64,7 +66,7 @@ public class DryRunNotificationAgent extends AbstractEventNotificationAgent {
     }
     log.info("Received dry run notification for {}", pipelineConfigId);
     Optional<Pipeline> match =
-        front50.getPipelines(application).stream()
+        front50.getPipelines(application).execute().body().stream()
             .filter(pipeline -> pipeline.getId().equals(pipelineConfigId))
             .findFirst();
 
@@ -83,12 +85,14 @@ public class DryRunNotificationAgent extends AbstractEventNotificationAgent {
               .build();
       OrcaService.TriggerResponse response =
           orca.trigger(
-              pipeline
-                  .withName(format("%s (dry run)", pipeline.getName()))
-                  .withId(null)
-                  .withTrigger(trigger)
-                  .withNotifications(
-                      mapper.convertValue(properties.getNotifications(), List.class)));
+                  pipeline
+                      .withName(format("%s (dry run)", pipeline.getName()))
+                      .withId(null)
+                      .withTrigger(trigger)
+                      .withNotifications(
+                          mapper.convertValue(properties.getNotifications(), List.class)))
+              .execute()
+              .body();
       log.info("Pipeline triggered: {}", response);
     } catch (Exception ex) {
       log.error("Error triggering dry run of {}", pipelineConfigId, ex);

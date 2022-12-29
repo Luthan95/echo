@@ -47,15 +47,15 @@ class BearychatNotificationService implements NotificationService {
   EchoResponse.Void handle(Notification notification) {
     //TODO: add body templates
     def body = notificationTemplateEngine.build(notification, NotificationTemplateEngine.Type.BODY)
-    List<BearychatUserInfo> userList = bearychatService.getUserList(token)
+    List<BearychatUserInfo> userList = bearychatService.getUserList(token).execute().body()
     notification.to.each {
       String userid = getUseridByEmail(userList, it)
-      CreateP2PChannelResponse channelInfo = bearychatService.createp2pchannel(token, new CreateP2PChannelPara(user_id: userid))
+      CreateP2PChannelResponse channelInfo = bearychatService.createp2pchannel(token, new CreateP2PChannelPara(user_id: userid)).execute().body()
       String channelId = getVChannelid(channelInfo)
       //TODO:add text msg
       bearychatService.sendMessage(token, new SendMessagePara(vchannel_id: channelId,
         text: body,
-        attachments: " " ))
+        attachments: " " )).execute().body()
     }
   }
 

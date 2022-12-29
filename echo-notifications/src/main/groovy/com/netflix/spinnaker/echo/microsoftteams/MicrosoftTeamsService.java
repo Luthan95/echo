@@ -17,22 +17,26 @@
 package com.netflix.spinnaker.echo.microsoftteams;
 
 import com.netflix.spinnaker.kork.web.exceptions.InvalidRequestException;
+import com.netflix.spinnaker.retrofit.RetrofitResponseInterceptor;
 import com.netflix.spinnaker.retrofit.Slf4jRetrofitLogger;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.OkHttpClient;
+import okhttp3.Response;
+import okhttp3.logging.HttpLoggingInterceptor;
 import org.apache.commons.lang3.StringUtils;
-import retrofit.RestAdapter;
-import retrofit.client.Client;
-import retrofit.client.Response;
-import retrofit.converter.JacksonConverter;
+import retrofit2.Retrofit;
+import retrofit2.converter.jackson.JacksonConverterFactory;
 
 @Slf4j
 public class MicrosoftTeamsService {
-  private Client retrofitClient;
-  private RestAdapter.LogLevel retrofitLogLevel;
+  private OkHttpClient retrofitClient;
+  private HttpLoggingInterceptor.Level retrofitLogLevel;
 
-  public MicrosoftTeamsService(Client retrofitClient, RestAdapter.LogLevel retrofitLogLevel) {
+  public MicrosoftTeamsService(
+      OkHttpClient retrofitClient, HttpLoggingInterceptor.Level retrofitLogLevel) {
     this.retrofitClient = retrofitClient;
     this.retrofitLogLevel = retrofitLogLevel;
   }
@@ -41,16 +45,38 @@ public class MicrosoftTeamsService {
     // The RestAdapter instantiation needs to occur for each message to be sent as
     // the incoming webhook base URL and path may be different for each Teams channel
     MicrosoftTeamsClient microsoftTeamsClient =
-        new RestAdapter.Builder()
-            .setConverter(new JacksonConverter())
-            .setClient(retrofitClient)
-            .setEndpoint(getEndpointUrl(webhookUrl))
-            .setLogLevel(retrofitLogLevel)
-            .setLog(new Slf4jRetrofitLogger(MicrosoftTeamsClient.class))
+        new Retrofit.Builder()
+            .baseUrl(getEndpointUrl(webhookUrl))
+            .addConverterFactory(JacksonConverterFactory.create())
+            .client(
+                retrofitClient
+                    .newBuilder()
+                    .addInterceptor(new RetrofitResponseInterceptor())
+                    .addInterceptor(
+                        new HttpLoggingInterceptor(
+                                new Slf4jRetrofitLogger(MicrosoftTeamsClient.class))
+                            .setLevel(retrofitLogLevel))
+                    .build())
             .build()
             .create(MicrosoftTeamsClient.class);
+    //    MicrosoftTeamsClient microsoftTeamsClient =
+    //        new RestAdapter.Builder()
+    //            .setConverter(new JacksonConverter())
+    //            .setClient(retrofitClient)
+    //            .setEndpoint(getEndpointUrl(webhookUrl))
+    //            .setLogLevel(retrofitLogLevel)
+    //            .setLog(new Slf4jRetrofitLogger(MicrosoftTeamsClient.class))
+    //            .build()
+    //            .create(MicrosoftTeamsClient.class);
 
-    return microsoftTeamsClient.sendMessage(getRelativePath(webhookUrl), message);
+    try {
+      return microsoftTeamsClient
+          .sendMessage(getRelativePath(webhookUrl), message)
+          .execute()
+          .body();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private String getEndpointUrl(String webhookUrl) {

@@ -27,10 +27,10 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.MediaType;
+import okhttp3.RequestBody;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import retrofit.mime.TypedByteArray;
-import retrofit.mime.TypedInput;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 @Slf4j
@@ -53,13 +53,18 @@ public class GoogleCloudBuildArtifactExtractor implements ArtifactExtractor {
 
   @Override
   public List<Artifact> getArtifacts(String messagePayload) {
-    TypedInput build =
-        new TypedByteArray("application/json", messagePayload.getBytes(StandardCharsets.UTF_8));
+    RequestBody build =
+        RequestBody.create(
+            MediaType.parse("application/json"), messagePayload.getBytes(StandardCharsets.UTF_8));
     try {
       return retrySupport.retry(
           () ->
               AuthenticatedRequest.allowAnonymous(
-                  () -> igorService.extractGoogleCloudBuildArtifacts(account, build)),
+                  () ->
+                      igorService
+                          .extractGoogleCloudBuildArtifacts(account, build)
+                          .execute()
+                          .body()),
           5,
           2000,
           false);

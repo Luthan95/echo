@@ -15,9 +15,9 @@
  */
 
 dependencies {
-  implementation "com.squareup.retrofit:retrofit"
-  implementation "com.squareup.retrofit:converter-jackson"
-  implementation "com.jakewharton.retrofit:retrofit1-okhttp3-client"
+  implementation "com.squareup.retrofit2:retrofit"
+  implementation "com.squareup.retrofit2:converter-jackson"
+//  implementation "com.jakewharton.retrofit:retrofit1-okhttp3-client"
   implementation project(':echo-model')
   implementation project(':echo-api')
   implementation project(':echo-core')

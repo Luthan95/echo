@@ -19,49 +19,50 @@ package com.netflix.spinnaker.echo.services;
 import com.netflix.spinnaker.kork.artifacts.model.Artifact;
 import java.util.List;
 import java.util.Map;
-import retrofit.client.Response;
-import retrofit.http.*;
-import retrofit.mime.TypedInput;
+import okhttp3.RequestBody;
+import retrofit2.Call;
+import retrofit2.Response;
+import retrofit2.http.*;
 
 public interface IgorService {
   @GET("/builds/status/{buildNumber}/{master}/{job}")
-  Map<String, Object> getBuild(
+  Call<Map<String, Object>> getBuild(
       @Path("buildNumber") Integer buildNumber,
       @Path("master") String master,
-      @Path(value = "job", encode = false) String job);
+      @Path(value = "job", encoded = false) String job);
 
   @GET("/builds/properties/{buildNumber}/{fileName}/{master}/{job}")
-  Map<String, Object> getPropertyFile(
+  Call<Map<String, Object>> getPropertyFile(
       @Path("buildNumber") Integer buildNumber,
       @Path("fileName") String fileName,
       @Path("master") String master,
-      @Path(value = "job", encode = false) String job);
+      @Path(value = "job", encoded = false) String job);
 
   @GET("/builds/artifacts/{buildNumber}/{master}/{job}")
-  List<Artifact> getArtifacts(
+  Call<List<Artifact>> getArtifacts(
       @Path("buildNumber") Integer buildNumber,
       @Query("propertyFile") String propertyFile,
       @Path("master") String master,
-      @Path(value = "job", encode = false) String job);
+      @Path(value = "job", encoded = false) String job);
 
   @GET("/artifacts/{provider}/{packageName}")
-  List<String> getVersions(
+  Call<List<String>> getVersions(
       @Path("provider") String provider, @Path("packageName") String packageName);
 
   @GET("/artifacts/{provider}/{packageName}/{version}")
-  Artifact getArtifactByVersion(
+  Call<Artifact> getArtifactByVersion(
       @Path("provider") String provider,
       @Path("packageName") String packageName,
       @Path("version") String version);
 
   @PUT("/gcb/builds/{account}/{buildId}")
-  Response updateBuildStatus(
+  Call<Response> updateBuildStatus(
       @Path("account") String account,
       @Path("buildId") String buildId,
       @Query("status") String status,
-      @Body TypedInput build);
+      @Body RequestBody build);
 
   @PUT("/gcb/artifacts/extract/{account}")
-  List<Artifact> extractGoogleCloudBuildArtifacts(
-      @Path("account") String account, @Body TypedInput build);
+  Call<List<Artifact>> extractGoogleCloudBuildArtifacts(
+      @Path("account") String account, @Body RequestBody build);
 }

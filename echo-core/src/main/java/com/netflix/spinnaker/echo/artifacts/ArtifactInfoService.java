@@ -19,6 +19,7 @@ package com.netflix.spinnaker.echo.artifacts;
 
 import com.netflix.spinnaker.echo.services.IgorService;
 import com.netflix.spinnaker.kork.artifacts.model.Artifact;
+import java.io.IOException;
 import java.util.List;
 
 /** Given an artifact, fetch the details from an artifact provider */
@@ -30,11 +31,12 @@ public class ArtifactInfoService {
     this.igorService = igorService;
   }
 
-  public List<String> getVersions(String provider, String packageName) {
-    return igorService.getVersions(provider, packageName);
+  public List<String> getVersions(String provider, String packageName) throws IOException {
+    return igorService.getVersions(provider, packageName).execute().body();
   }
 
-  public Artifact getArtifactByVersion(String provider, String packageName, String version) {
-    return igorService.getArtifactByVersion(provider, packageName, version);
+  public Artifact getArtifactByVersion(String provider, String packageName, String version)
+      throws IOException {
+    return igorService.getArtifactByVersion(provider, packageName, version).execute().body();
   }
 }

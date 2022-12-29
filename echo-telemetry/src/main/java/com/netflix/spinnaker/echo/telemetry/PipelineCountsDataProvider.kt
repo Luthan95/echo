@@ -46,7 +46,7 @@ class PipelineCountsDataProvider(private val front50: Front50Service) : Telemetr
   }
 
   private fun retrievePipelines(): Map<String, Int> {
-    return AuthenticatedRequest.allowAnonymous { front50.pipelines }
+    return AuthenticatedRequest.allowAnonymous { front50.pipelines.execute().body() }
       .filter { it.containsKey("application") }
       .groupBy { it["application"] as String }
       .mapValues { it.value.size }

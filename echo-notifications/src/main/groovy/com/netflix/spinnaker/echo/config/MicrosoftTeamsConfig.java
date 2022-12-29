@@ -18,11 +18,11 @@ package com.netflix.spinnaker.echo.config;
 
 import com.netflix.spinnaker.echo.microsoftteams.MicrosoftTeamsService;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import retrofit.RestAdapter;
-import retrofit.client.Client;
 
 @Configuration
 @ConditionalOnProperty("microsoftteams.enabled")
@@ -31,7 +31,7 @@ public class MicrosoftTeamsConfig {
 
   @Bean
   public MicrosoftTeamsService microsoftTeamsService(
-      Client retrofitClient, RestAdapter.LogLevel retrofitLogLevel) {
+      OkHttpClient retrofitClient, HttpLoggingInterceptor.Level retrofitLogLevel) {
     log.info("Microsoft Teams service loaded");
 
     return new MicrosoftTeamsService(retrofitClient, retrofitLogLevel);

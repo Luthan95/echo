@@ -59,6 +59,6 @@ class NotificationServiceSpec extends Specification {
     twilioNotificationService.handle(notification)
 
     then:
-    1 * twilioService.sendMessage("account", "222-333-4444", "111-222-3333", "generic SPINNAKER_URL application")
+    1 * twilioService.sendMessage("account", "222-333-4444", "111-222-3333", "generic SPINNAKER_URL application").execute().body()
   }
 }

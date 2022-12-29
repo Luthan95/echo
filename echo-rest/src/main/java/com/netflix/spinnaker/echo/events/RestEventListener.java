@@ -23,6 +23,7 @@ import com.netflix.spinnaker.echo.api.events.EventListener;
 import com.netflix.spinnaker.echo.config.RestUrls;
 import com.netflix.spinnaker.echo.jackson.EchoObjectMapper;
 import com.netflix.spinnaker.kork.core.RetrySupport;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -104,7 +105,13 @@ class RestEventListener implements EventListener {
 
                 Map<String, Object> finalEventMap = eventMap;
                 retrySupport.retry(
-                    () -> service.getClient().recordEvent(finalEventMap),
+                    () -> {
+                      try {
+                        return service.getClient().recordEvent(finalEventMap).execute().body();
+                      } catch (IOException e) {
+                        throw new RuntimeException(e);
+                      }
+                    },
                     service.getConfig().getRetryCount(),
                     Duration.ofMillis(200),
                     false);

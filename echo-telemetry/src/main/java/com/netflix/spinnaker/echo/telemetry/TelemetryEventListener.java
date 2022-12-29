@@ -26,10 +26,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.MediaType;
+import okhttp3.RequestBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import retrofit.mime.TypedString;
 
 @Slf4j
 @Component
@@ -103,7 +104,15 @@ public class TelemetryEventListener implements EventListener {
 
       registry
           .circuitBreaker(TELEMETRY_REGISTRY_NAME)
-          .executeCallable(() -> telemetryService.log(new TypedJsonString(jsonContent)));
+          .executeCallable(
+              () ->
+                  telemetryService
+                      .log(
+                          RequestBody.create(
+                              MediaType.parse("application/json"),
+                              jsonContent.getBytes(StandardCharsets.UTF_8)))
+                      .execute()
+                      .body());
       log.debug("Telemetry sent!");
     } catch (CallNotPermittedException cnpe) {
       log.debug(
@@ -115,19 +124,19 @@ public class TelemetryEventListener implements EventListener {
     }
   }
 
-  static class TypedJsonString extends TypedString {
-    TypedJsonString(String body) {
-      super(body);
-    }
-
-    @Override
-    public String mimeType() {
-      return "application/json";
-    }
-
-    @Override
-    public String toString() {
-      return new String(getBytes(), StandardCharsets.UTF_8);
-    }
-  }
+  //  static class TypedJsonString extends TypedString {
+  //    TypedJsonString(String body) {
+  //      super(body);
+  //    }
+  //
+  //    @Override
+  //    public String mimeType() {
+  //      return "application/json";
+  //    }
+  //
+  //    @Override
+  //    public String toString() {
+  //      return new String(getBytes(), StandardCharsets.UTF_8);
+  //    }
+  //  }
 }

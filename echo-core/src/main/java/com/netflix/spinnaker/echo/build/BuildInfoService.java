@@ -24,6 +24,7 @@ import com.netflix.spinnaker.echo.model.trigger.BuildEvent;
 import com.netflix.spinnaker.echo.services.IgorService;
 import com.netflix.spinnaker.kork.artifacts.model.Artifact;
 import com.netflix.spinnaker.kork.core.RetrySupport;
+import java.io.IOException;
 import java.util.*;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +50,15 @@ public class BuildInfoService {
   // an event as with other triggers, but for now we'll see whether we can extract a build event
   // from the trigger.
   public BuildEvent getBuildEvent(String master, String job, int buildNumber) {
-    Map<String, Object> rawBuild = retry(() -> igorService.getBuild(buildNumber, master, job));
+    Map<String, Object> rawBuild =
+        retry(
+            () -> {
+              try {
+                return igorService.getBuild(buildNumber, master, job).execute().body();
+              } catch (IOException e) {
+                throw new RuntimeException(e);
+              }
+            });
     BuildEvent.Build build = objectMapper.convertValue(rawBuild, BuildEvent.Build.class);
     BuildEvent.Project project = new BuildEvent.Project(job, build);
     BuildEvent.Content content = new BuildEvent.Content(project, master);
@@ -64,7 +73,14 @@ public class BuildInfoService {
     int buildNumber = event.getBuildNumber();
 
     if (StringUtils.isNoneEmpty(master, job)) {
-      return retry(() -> igorService.getBuild(buildNumber, master, job));
+      return retry(
+          () -> {
+            try {
+              return igorService.getBuild(buildNumber, master, job).execute().body();
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          });
     }
     return Collections.emptyMap();
   }
@@ -79,7 +95,17 @@ public class BuildInfoService {
     }
     String propertyFileFinal = propertyFile;
     if (StringUtils.isNoneEmpty(master, job, propertyFile)) {
-      return retry(() -> igorService.getPropertyFile(buildNumber, propertyFileFinal, master, job));
+      return retry(
+          () -> {
+            try {
+              return igorService
+                  .getPropertyFile(buildNumber, propertyFileFinal, master, job)
+                  .execute()
+                  .body();
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          });
     }
     return Collections.emptyMap();
   }
@@ -89,7 +115,17 @@ public class BuildInfoService {
     String job = event.getContent().getProject().getName();
     int buildNumber = event.getBuildNumber();
     if (StringUtils.isNoneEmpty(master, job, propertyFile)) {
-      return retry(() -> igorService.getArtifacts(buildNumber, propertyFile, master, job));
+      return retry(
+          () -> {
+            try {
+              return igorService
+                  .getArtifacts(buildNumber, propertyFile, master, job)
+                  .execute()
+                  .body();
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          });
     }
     return Collections.emptyList();
   }

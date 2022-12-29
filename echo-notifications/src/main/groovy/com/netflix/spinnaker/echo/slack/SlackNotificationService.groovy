@@ -63,7 +63,7 @@ class SlackNotificationService implements NotificationService {
           address, true)
       }
       log.trace("Received response from Slack: {} {} for message '{}'. {}",
-        response?.status, response?.reason, text, response?.body)
+        response?.code(), response?.message(), text, response?.body())
     }
 
     new EchoResponse.Void()

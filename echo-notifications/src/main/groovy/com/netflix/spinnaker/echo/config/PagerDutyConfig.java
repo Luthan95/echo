@@ -16,42 +16,57 @@
 
 package com.netflix.spinnaker.echo.config;
 
-import static retrofit.Endpoints.newFixedEndpoint;
-
 import com.netflix.spinnaker.echo.pagerduty.PagerDutyService;
+import com.netflix.spinnaker.retrofit.RetrofitResponseInterceptor;
 import com.netflix.spinnaker.retrofit.Slf4jRetrofitLogger;
+import java.util.Objects;
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import retrofit.Endpoint;
-import retrofit.RestAdapter;
-import retrofit.client.Client;
-import retrofit.converter.JacksonConverter;
+import retrofit2.Retrofit;
+import retrofit2.converter.jackson.JacksonConverterFactory;
 
 @Configuration
 @ConditionalOnProperty("pager-duty.enabled")
 public class PagerDutyConfig {
   private static final Logger log = LoggerFactory.getLogger(PagerDutyConfig.class);
 
-  @Bean
-  Endpoint pagerDutyEndpoint() {
-    return newFixedEndpoint("https://events.pagerduty.com");
-  }
+  //  @Bean
+  //  Endpoint pagerDutyEndpoint() {
+  //    return newFixedEndpoint("https://events.pagerduty.com");
+  //  }
 
   @Bean
   PagerDutyService pagerDutyService(
-      Endpoint pagerDutyEndpoint, Client retrofitClient, RestAdapter.LogLevel retrofitLogLevel) {
+      OkHttpClient retrofitClient, HttpLoggingInterceptor.Level retrofitLogLevel) {
     log.info("Pager Duty service loaded");
 
-    return new RestAdapter.Builder()
-        .setEndpoint(pagerDutyEndpoint)
-        .setConverter(new JacksonConverter())
-        .setClient(retrofitClient)
-        .setLogLevel(retrofitLogLevel)
-        .setLog(new Slf4jRetrofitLogger(PagerDutyService.class))
+    return new Retrofit.Builder()
+        .baseUrl(Objects.requireNonNull(HttpUrl.parse("https://events.pagerduty.com/")))
+        .client(
+            retrofitClient
+                .newBuilder()
+                .addInterceptor(new RetrofitResponseInterceptor())
+                .addInterceptor(
+                    new HttpLoggingInterceptor(new Slf4jRetrofitLogger(PagerDutyService.class))
+                        .setLevel(retrofitLogLevel))
+                .build())
+        .addConverterFactory(JacksonConverterFactory.create())
         .build()
         .create(PagerDutyService.class);
+
+    //    return new RestAdapter.Builder()
+    //        .setEndpoint(pagerDutyEndpoint)
+    //        .setConverter(new JacksonConverter())
+    //        .setClient(retrofitClient)
+    //        .setLogLevel(retrofitLogLevel)
+    //        .setLog(new Slf4jRetrofitLogger(PagerDutyService.class))
+    //        .build()
+    //        .create(PagerDutyService.class);
   }
 }

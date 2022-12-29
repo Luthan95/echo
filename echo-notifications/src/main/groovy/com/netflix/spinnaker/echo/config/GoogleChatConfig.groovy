@@ -16,20 +16,22 @@
 
 package com.netflix.spinnaker.echo.config
 
+import com.netflix.spinnaker.echo.github.GithubService
 import com.netflix.spinnaker.echo.googlechat.GoogleChatService
 import com.netflix.spinnaker.echo.googlechat.GoogleChatClient
+import com.netflix.spinnaker.retrofit.RetrofitResponseInterceptor
 import com.netflix.spinnaker.retrofit.Slf4jRetrofitLogger
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import okhttp3.HttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import retrofit.Endpoint
-import retrofit.RestAdapter
-import retrofit.client.Client
-import retrofit.converter.JacksonConverter
+import retrofit2.Retrofit
+import retrofit2.converter.jackson.JacksonConverterFactory
 
-import static retrofit.Endpoints.newFixedEndpoint
 
 @Configuration
 @ConditionalOnProperty('googlechat.enabled')
@@ -37,24 +39,33 @@ import static retrofit.Endpoints.newFixedEndpoint
 @CompileStatic
 class GoogleChatConfig {
 
-  @Bean
-  Endpoint chatEndpoint() {
-    newFixedEndpoint("https://chat.googleapis.com")
-  }
+//  @Bean
+//  Endpoint chatEndpoint() {
+//    newFixedEndpoint("https://chat.googleapis.com")
+//  }
 
   @Bean
-  GoogleChatService chatService(Endpoint chatEndpoint, Client retrofitClient, RestAdapter.LogLevel retrofitLogLevel) {
+  GoogleChatService chatService(OkHttpClient retrofitClient, HttpLoggingInterceptor.Level retrofitLogLevel) {
 
     log.info("Chat service loaded");
 
-    def chatClient = new RestAdapter.Builder()
-            .setConverter(new JacksonConverter())
-            .setClient(retrofitClient)
-            .setEndpoint(chatEndpoint)
-            .setLogLevel(retrofitLogLevel)
-            .setLog(new Slf4jRetrofitLogger(GoogleChatClient.class))
-            .build()
-            .create(GoogleChatClient.class)
+    def chatClient = new Retrofit.Builder()
+          .baseUrl(Objects.requireNonNull(HttpUrl.parse("https://chat.googleapis.com")))
+          .client(retrofitClient.newBuilder()
+            .addInterceptor(new RetrofitResponseInterceptor())
+            .addInterceptor(new HttpLoggingInterceptor(new Slf4jRetrofitLogger(GoogleChatClient.class)).setLevel(retrofitLogLevel))
+            .build())
+          .addConverterFactory(JacksonConverterFactory.create())
+          .build().create(GoogleChatClient.class);
+
+//    def chatClient = new RestAdapter.Builder()
+//            .setConverter(new JacksonConverter())
+//            .setClient(retrofitClient)
+//            .setEndpoint(chatEndpoint)
+//            .setLogLevel(retrofitLogLevel)
+//            .setLog(new Slf4jRetrofitLogger(GoogleChatClient.class))
+//            .build()
+//            .create(GoogleChatClient.class)
 
     new GoogleChatService(chatClient)
   }

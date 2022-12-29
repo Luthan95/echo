@@ -29,7 +29,9 @@ import com.netflix.spinnaker.fiat.shared.FiatPermissionEvaluator;
 import com.netflix.spinnaker.fiat.shared.FiatStatus;
 import com.netflix.spinnaker.kork.discovery.DiscoveryStatusListener;
 import com.netflix.spinnaker.kork.dynamicconfig.DynamicConfigService;
+import com.netflix.spinnaker.retrofit.RetrofitException;
 import com.netflix.spinnaker.security.AuthenticatedRequest;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -42,15 +44,13 @@ import java.util.stream.Collectors;
 import javax.annotation.PostConstruct;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.ResponseBody;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import retrofit.RetrofitError;
-import retrofit.RetrofitError.Kind;
-import retrofit.client.Response;
-import retrofit.mime.TypedByteArray;
+import retrofit2.Response;
 
 /** Triggers a {@link Pipeline} by invoking _Orca_. */
 @Component
@@ -174,13 +174,23 @@ public class PipelineInitiator {
             try {
               Map pipelineToPlan = objectMapper.convertValue(pipeline, Map.class);
               Map resolvedPipelineMap =
-                  AuthenticatedRequest.allowAnonymous(() -> orca.plan(pipelineToPlan, true));
+                  AuthenticatedRequest.allowAnonymous(
+                      () -> orca.plan(pipelineToPlan, true).execute().body());
               pipeline = objectMapper.convertValue(resolvedPipelineMap, Pipeline.class);
-            } catch (RetrofitError e) {
+            } catch (RetrofitException e) {
               String orcaResponse = "N/A";
 
-              if (e.getResponse() != null && e.getResponse().getBody() != null) {
-                orcaResponse = new String(((TypedByteArray) e.getResponse().getBody()).getBytes());
+              if (e.getResponse() != null) {
+                ResponseBody body = e.getResponse().errorBody();
+                try {
+                  if (body != null) {
+                    orcaResponse = new String(body.bytes());
+                  }
+                } catch (IOException io) {
+                  log.warn("Error occurred while streaming response", io);
+                } finally {
+                  body.close();
+                }
               }
 
               log.error("Failed planning {}: \n{}", pipeline, orcaResponse);
@@ -260,15 +270,23 @@ public class PipelineInitiator {
               "triggerType",
               getTriggerType(pipeline))
           .increment();
-    } catch (RetrofitError e) {
+    } catch (RetrofitException e) {
       String orcaResponse = "N/A";
       int status = 0;
 
       if (e.getResponse() != null) {
-        status = e.getResponse().getStatus();
-
-        if (e.getResponse().getBody() != null) {
-          orcaResponse = new String(((TypedByteArray) e.getResponse().getBody()).getBytes());
+        status = e.getResponse().code();
+        ResponseBody body = e.getResponse().errorBody();
+        try {
+          if (body != null) {
+            orcaResponse = new String(body.bytes());
+          }
+        } catch (IOException io) {
+          log.warn("Error occurred while streaming response", io);
+        } finally {
+          if (body != null) {
+            body.close();
+          }
         }
       }
 
@@ -290,14 +308,14 @@ public class PipelineInitiator {
     return null;
   }
 
-  private TriggerResponse triggerWithRetries(Pipeline pipeline) {
+  private TriggerResponse triggerWithRetries(Pipeline pipeline) throws IOException {
     int attempts = 0;
 
     while (true) {
       try {
         attempts++;
-        return orca.trigger(pipeline);
-      } catch (RetrofitError e) {
+        return orca.trigger(pipeline).execute().body();
+      } catch (RetrofitException | IOException e) {
         if ((attempts >= retryCount) || !isRetryableError(e)) {
           throw e;
         } else {
@@ -412,18 +430,21 @@ public class PipelineInitiator {
   }
 
   private static boolean isRetryableError(Throwable error) {
-    if (!(error instanceof RetrofitError)) {
+    if (error instanceof IOException) {
+      return true;
+    }
+    if (!(error instanceof RetrofitException)) {
       return false;
     }
-    RetrofitError retrofitError = (RetrofitError) error;
+    RetrofitException retrofitError = (RetrofitException) error;
 
-    if (retrofitError.getKind() == Kind.NETWORK) {
+    if (retrofitError.getKind() == RetrofitException.Kind.NETWORK) {
       return true;
     }
 
-    if (retrofitError.getKind() == Kind.HTTP) {
+    if (retrofitError.getKind() == RetrofitException.Kind.HTTP) {
       Response response = retrofitError.getResponse();
-      return (response != null && response.getStatus() != HttpStatus.BAD_REQUEST.value());
+      return (response != null && response.code() != HttpStatus.BAD_REQUEST.value());
     }
 
     return false;

@@ -16,20 +16,22 @@
 
 package com.netflix.spinnaker.echo.github;
 
-import retrofit.client.Response;
-import retrofit.http.*;
+import okhttp3.ResponseBody;
+import retrofit2.Call;
+import retrofit2.Response;
+import retrofit2.http.*;
 
 public interface GithubService {
   @POST("/repos/{repo}/statuses/{sha}")
-  Response updateCheck(
+  Call<Response> updateCheck(
       @Header("Authorization") String token,
-      @Path(value = "repo", encode = false) String repo,
+      @Path(value = "repo", encoded = false) String repo,
       @Path("sha") String sha,
       @Body GithubStatus status);
 
   @GET("/repos/{repo}/commits/{sha}")
-  Response getCommit(
+  Call<ResponseBody> getCommit(
       @Header("Authorization") String token,
-      @Path(value = "repo", encode = false) String repo,
+      @Path(value = "repo", encoded = false) String repo,
       @Path("sha") String sha);
 }

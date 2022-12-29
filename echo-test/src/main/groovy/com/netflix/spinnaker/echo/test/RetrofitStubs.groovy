@@ -11,14 +11,17 @@ import com.netflix.spinnaker.echo.model.trigger.*
 import com.netflix.spinnaker.echo.pipelinetriggers.eventhandlers.PubsubEventHandler
 import com.netflix.spinnaker.kork.artifacts.model.Artifact
 import com.netflix.spinnaker.kork.artifacts.model.ExpectedArtifact
-import retrofit.RetrofitError
-import retrofit.client.Response
+import com.netflix.spinnaker.retrofit.RetrofitException
+import okhttp3.Response
+
+//import retrofit.RetrofitError
+//import retrofit.client.Response
 
 import java.util.concurrent.atomic.AtomicInteger
 
 import static com.netflix.spinnaker.echo.model.trigger.BuildEvent.Result.BUILDING
 import static java.net.HttpURLConnection.HTTP_UNAVAILABLE
-import static retrofit.RetrofitError.httpError
+//import static retrofit.RetrofitError.httpError
 
 trait RetrofitStubs {
 
@@ -59,7 +62,7 @@ trait RetrofitStubs {
 
   private nextId = new AtomicInteger(1)
 
-  RetrofitError unavailable() {
+  RetrofitException unavailable() {
     httpError(url, new Response(url, HTTP_UNAVAILABLE, "Unavailable", [], null), null, null)
   }
 

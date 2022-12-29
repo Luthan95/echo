@@ -16,8 +16,10 @@
 
 package com.netflix.spinnaker.echo.googlechat;
 
+import com.netflix.spinnaker.retrofit.RetrofitException;
 import groovy.transform.Canonical;
-import retrofit.client.Response;
+import java.io.IOException;
+import okhttp3.Response;
 
 @Canonical
 public class GoogleChatService {
@@ -28,6 +30,10 @@ public class GoogleChatService {
   }
 
   Response sendMessage(String webhook, GoogleChatMessage message) {
-    return googleChatClient.sendMessage(webhook, message);
+    try {
+      return googleChatClient.sendMessage(webhook, message).execute().body();
+    } catch (IOException e) {
+      throw RetrofitException.networkError("", e);
+    }
   }
 }

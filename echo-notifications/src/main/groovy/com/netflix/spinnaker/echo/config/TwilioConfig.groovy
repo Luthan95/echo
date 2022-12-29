@@ -17,9 +17,14 @@
 package com.netflix.spinnaker.echo.config
 
 import com.netflix.spinnaker.echo.jackson.EchoObjectMapper
+import com.netflix.spinnaker.retrofit.RetrofitResponseInterceptor
 import com.netflix.spinnaker.retrofit.Slf4jRetrofitLogger
-
-import static retrofit.Endpoints.newFixedEndpoint
+import lombok.Setter
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.jackson.JacksonConverterFactory
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.netflix.spinnaker.echo.twilio.TwilioService
@@ -30,11 +35,6 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import retrofit.Endpoint
-import retrofit.RequestInterceptor
-import retrofit.RestAdapter
-import retrofit.client.Client
-import retrofit.converter.JacksonConverter
 
 @Configuration
 @ConditionalOnProperty('twilio.enabled')
@@ -42,40 +42,56 @@ import retrofit.converter.JacksonConverter
 @CompileStatic
 class TwilioConfig {
 
-    @Bean
-    Endpoint twilioEndpoint(@Value('${twilio.base-url:https://api.twilio.com/}') String twilioBaseUrl) {
-        newFixedEndpoint(twilioBaseUrl)
-    }
+    @Setter
+    @Value('${twilio.base-url:https://api.twilio.com/}')
+    private String twilioBaseUrl
 
     @Bean
     TwilioService twilioService(
-            @Value('${twilio.account}') String username,
-            @Value('${twilio.token}') String password,
-            Endpoint twilioEndpoint,
-            Client retrofitClient,
-            RestAdapter.LogLevel retrofitLogLevel) {
+      @Value('${twilio.account}') String username,
+      @Value('${twilio.token}') String password,
+      OkHttpClient retrofitClient,
+      HttpLoggingInterceptor.Level retrofitLogLevel) {
 
         log.info('twilio service loaded')
 
-        RequestInterceptor authInterceptor = new RequestInterceptor() {
-            @Override
-            public void intercept(RequestInterceptor.RequestFacade request) {
-                String auth = "Basic " + Base64.encodeBase64String("${username}:${password}".getBytes())
-                request.addHeader("Authorization", auth)
-            }
-        }
+        retrofitClient = retrofitClient.newBuilder()
+          .addInterceptor({ chain ->
+            String auth = "Basic " + Base64.encodeBase64String("${username}:${password}".getBytes())
+            Request.Builder builder = chain.request().newBuilder();
+            builder.addHeader("Authorization", auth);
+            return chain.proceed(builder.build());
+          })
+          .addInterceptor(new RetrofitResponseInterceptor())
+          .addInterceptor(new HttpLoggingInterceptor(new Slf4jRetrofitLogger(TwilioService.class)).setLevel(retrofitLogLevel))
+          .build();
 
-        JacksonConverter converter = new JacksonConverter(EchoObjectMapper.getInstance())
+  //        RequestInterceptor authInterceptor = new RequestInterceptor() {
+  //            @Override
+  //            public void intercept(RequestInterceptor.RequestFacade request) {
+  //                String auth = "Basic " + Base64.encodeBase64String("${username}:${password}".getBytes())
+  //                request.addHeader("Authorization", auth)
+  //            }
+  //        }
 
-        new RestAdapter.Builder()
-                .setEndpoint(twilioEndpoint)
-                .setRequestInterceptor(authInterceptor)
-                .setClient(retrofitClient)
-                .setLogLevel(retrofitLogLevel)
-                .setLog(new Slf4jRetrofitLogger(TwilioService.class))
-                .setConverter(converter)
-                .build()
-                .create(TwilioService.class)
+         new Retrofit.Builder()
+          .baseUrl(twilioBaseUrl)
+          .client(retrofitClient)
+          .addConverterFactory(JacksonConverterFactory.create(EchoObjectMapper.getInstance()))
+          .build()
+          .create(TwilioService.class);
+
+//        JacksonConverter converter = new JacksonConverter(EchoObjectMapper.getInstance())
+//
+//        new RestAdapter.Builder()
+//                .setEndpoint(twilioEndpoint)
+//                .setRequestInterceptor(authInterceptor)
+//                .setClient(retrofitClient)
+//                .setLogLevel(retrofitLogLevel)
+//                .setLog(new Slf4jRetrofitLogger(TwilioService.class))
+//                .setConverter(converter)
+//                .build()
+//                .create(TwilioService.class)
     }
 
 }

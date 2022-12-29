@@ -2,34 +2,40 @@ package com.netflix.spinnaker.echo.services
 
 import groovy.json.JsonOutput
 import com.netflix.spinnaker.echo.model.Trigger
-import retrofit.Endpoints
-import retrofit.RestAdapter
-import retrofit.converter.JacksonConverter
+import okhttp3.Headers
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.ResponseBody
+import retrofit2.Retrofit
+import retrofit2.converter.jackson.JacksonConverterFactory
 import spock.lang.Ignore
 import spock.lang.Specification
 import spock.lang.Subject
 import com.google.common.collect.ImmutableList
-import retrofit.client.Client
-import retrofit.client.Header
-import retrofit.client.Response
-import retrofit.mime.TypedString
+
 
 class Front50ServiceSpec extends Specification {
   def endpoint = "http://front50-prestaging.prod.netflix.net"
-  def client = Stub(Client)
-  @Subject front50 = new RestAdapter.Builder()
-    .setEndpoint(Endpoints.newFixedEndpoint(endpoint))
-    .setConverter(new JacksonConverter())
-    .setClient(client)
-    .build()
-    .create(Front50Service)
+  def client = Stub(OkHttpClient)
+  @Subject front50 = new Retrofit.Builder()
+      .baseUrl(endpoint)
+      .addConverterFactory(JacksonConverterFactory.create())
+      .client(client)
+      .build().create(Front50Service);
+//    new RestAdapter.Builder()
+//    .setEndpoint(Endpoints.newFixedEndpoint(endpoint))
+//    .setConverter(new JacksonConverter())
+//    .setClient(client)
+//    .build()
+//    .create(Front50Service)
 
   def "parses pipelines"() {
     given:
     client.execute(_) >> response(pipelineWithNoTriggers)
 
     when:
-    def pipelines = front50.getPipelines()
+    def pipelines = front50.getPipelines().execute().body()
 
     then:
     !pipelines.empty
@@ -40,7 +46,7 @@ class Front50ServiceSpec extends Specification {
     client.execute(_) >> response(pipelineWithNoTriggers)
 
     when:
-    def pipelines = front50.getPipelines()
+    def pipelines = front50.getPipelines().execute().body()
 
     then:
     def pipeline = pipelines.first()
@@ -52,7 +58,7 @@ class Front50ServiceSpec extends Specification {
     client.execute(_) >> response(pipelineWithJenkinsTrigger)
 
     when:
-    def pipelines = front50.getPipelines()
+    def pipelines = front50.getPipelines().execute().body()
 
     then:
     def pipeline = pipelines.find { it.application == "rush" && it.name == "bob the sinner" }
@@ -71,7 +77,7 @@ class Front50ServiceSpec extends Specification {
     client.execute(_) >> response(parallelPipeline)
 
     when:
-    def pipelines = front50.getPipelines()
+    def pipelines = front50.getPipelines().execute().body()
 
     then:
     pipelines.first().parallel
@@ -80,7 +86,7 @@ class Front50ServiceSpec extends Specification {
   @Ignore
   def "list properties are immutable"() {
     given:
-    def pipelines = front50.getPipelines()
+    def pipelines = front50.getPipelines().execute().body()
     def pipeline = pipelines.find { it.application == "kato" }
 
     expect:
@@ -93,8 +99,15 @@ class Front50ServiceSpec extends Specification {
     thrown UnsupportedOperationException
   }
 
-  private Response response(Map... pipelines) {
-    new Response("", 200, "OK", [new Header("Content-Type", "application/json")], new TypedString(JsonOutput.toJson(pipelines)))
+  private retrofit2.Response response(Map... pipelines) {
+    new retrofit2.Response<>(new okhttp3.Response.Builder() //
+      .code(200)
+      .message("OK")
+      .protocol(Protocol.HTTP_1_1)
+      .headers(Headers.of("Content-Type", "application/json"))
+      .request(new Request.Builder().url("http://localhost/").build())
+      .build(), JsonOutput.toJson(pipelines))
+//    new Response("", 200, "OK", [new Header("Content-Type", "application/json")], new TypedString(JsonOutput.toJson(pipelines)))
   }
 
   def pipelineWithNoTriggers = [

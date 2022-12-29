@@ -30,6 +30,8 @@ import com.netflix.spinnaker.echo.jira.JiraService.IssueTransitions;
 import com.netflix.spinnaker.echo.jira.JiraService.TransitionIssueRequest;
 import com.netflix.spinnaker.echo.notification.NotificationService;
 import com.netflix.spinnaker.kork.core.RetrySupport;
+import com.netflix.spinnaker.retrofit.RetrofitException;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -42,8 +44,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.ResponseStatus;
-import retrofit.RetrofitError;
-import retrofit.client.Response;
+import retrofit2.Response;
 
 @Component
 @ConditionalOnProperty("jira.enabled")
@@ -151,21 +152,50 @@ public class JiraNotificationService implements NotificationService {
   }
 
   private Supplier<IssueTransitions> getIssueTransitions(String issueIdOrKey) {
-    return () -> jiraService.getIssueTransitions(issueIdOrKey);
+    return () -> {
+      try {
+        return jiraService.getIssueTransitions(issueIdOrKey).execute().body();
+      } catch (IOException e) {
+        throw RetrofitException.networkError("", e);
+      }
+    };
   }
 
   private Supplier<Response> transitionIssue(
       String issueIdOrKey, Map<String, Object> transitionDetails) {
-    return () ->
-        jiraService.transitionIssue(issueIdOrKey, new TransitionIssueRequest(transitionDetails));
+    return () -> {
+      try {
+        return jiraService
+            .transitionIssue(issueIdOrKey, new TransitionIssueRequest(transitionDetails))
+            .execute()
+            .body();
+      } catch (IOException e) {
+        throw RetrofitException.networkError("", e);
+      }
+    };
   }
 
   private Supplier<Response> addComment(String issueIdOrKey, String comment) {
-    return () -> jiraService.addComment(issueIdOrKey, new CommentIssueRequest(comment));
+    return () -> {
+      try {
+        return jiraService
+            .addComment(issueIdOrKey, new CommentIssueRequest(comment))
+            .execute()
+            .body();
+      } catch (IOException e) {
+        throw RetrofitException.networkError("", e);
+      }
+    };
   }
 
   private Supplier<CreateIssueResponse> createIssue(Map<String, Object> issueRequestBody) {
-    return () -> jiraService.createIssue(new CreateIssueRequest(issueRequestBody));
+    return () -> {
+      try {
+        return jiraService.createIssue(new CreateIssueRequest(issueRequestBody)).execute().body();
+      } catch (IOException e) {
+        throw RetrofitException.networkError("", e);
+      }
+    };
   }
 
   private Map<String, Object> issueRequestBody(Notification notification) {
@@ -181,10 +211,10 @@ public class JiraNotificationService implements NotificationService {
   }
 
   private Map errors(Exception exception) {
-    if (exception instanceof RetrofitError) {
+    if (exception instanceof RetrofitException) {
       try {
         return mapper.readValue(
-            ((RetrofitError) exception).getResponse().getBody().in(), Map.class);
+            ((RetrofitException) exception).getResponse().errorBody().byteStream(), Map.class);
       } catch (Exception e) {
         LOGGER.warn("failed retrieving error messages {}", e.getMessage());
       }

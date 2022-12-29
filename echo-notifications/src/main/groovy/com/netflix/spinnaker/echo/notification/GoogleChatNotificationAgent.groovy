@@ -20,10 +20,10 @@ import com.netflix.spinnaker.echo.googlechat.GoogleChatMessage
 import com.netflix.spinnaker.echo.googlechat.GoogleChatService
 import com.netflix.spinnaker.echo.api.events.Event
 import groovy.util.logging.Slf4j
+import okhttp3.Response
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
-import retrofit.client.Response
 
 import static net.logstash.logback.argument.StructuredArguments.kv
 import static org.apache.commons.lang3.text.WordUtils.capitalize
@@ -85,7 +85,7 @@ public class GoogleChatNotificationAgent extends AbstractEventNotificationAgent 
     Response response = googleChatService.sendMessage(partialWebhookURL, new GoogleChatMessage(body))
 
     log.info("Received response from Google Chat: {} {} for execution id {}. {}",
-      response?.status, response?.reason, event.content?.execution?.id, response?.body)
+      response?.code(), response?.message(), event.content?.execution?.id, response?.body())
   }
 
   @Override

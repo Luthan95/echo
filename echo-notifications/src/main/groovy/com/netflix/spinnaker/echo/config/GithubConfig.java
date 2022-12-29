@@ -17,46 +17,64 @@
 package com.netflix.spinnaker.echo.config;
 
 import com.netflix.spinnaker.echo.github.GithubService;
+import com.netflix.spinnaker.retrofit.RetrofitResponseInterceptor;
 import com.netflix.spinnaker.retrofit.Slf4jRetrofitLogger;
+import java.util.Objects;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import retrofit.Endpoint;
-import retrofit.Endpoints;
-import retrofit.RestAdapter;
-import retrofit.client.Client;
-import retrofit.converter.JacksonConverter;
+import retrofit2.Retrofit;
+import retrofit2.converter.jackson.JacksonConverterFactory;
 
 @Configuration
 @ConditionalOnProperty("github-status.enabled")
 @Slf4j
 public class GithubConfig {
 
+  @Setter
   @Value("${github-status.endpoint:https://api.github.com}")
   private String endpoint;
 
-  @Bean
-  public Endpoint githubEndpoint() {
-    return Endpoints.newFixedEndpoint(endpoint);
-  }
+  //  @Bean
+  //  public Endpoint githubEndpoint() {
+  //    return Endpoints.newFixedEndpoint(endpoint);
+  //  }
 
   @Bean
   public GithubService githubService(
-      Endpoint githubEndpoint, Client retrofitClient, RestAdapter.LogLevel retrofitLogLevel) {
+      OkHttpClient retrofitClient, HttpLoggingInterceptor.Level retrofitLogLevel) {
     log.info("Github service loaded");
 
-    GithubService githubClient =
-        new RestAdapter.Builder()
-            .setEndpoint(githubEndpoint)
-            .setConverter(new JacksonConverter())
-            .setClient(retrofitClient)
-            .setLogLevel(RestAdapter.LogLevel.FULL)
-            .setLog(new Slf4jRetrofitLogger(GithubService.class))
-            .build()
-            .create(GithubService.class);
+    return new Retrofit.Builder()
+        .baseUrl(Objects.requireNonNull(HttpUrl.parse(endpoint)))
+        .client(
+            retrofitClient
+                .newBuilder()
+                .addInterceptor(new RetrofitResponseInterceptor())
+                .addInterceptor(
+                    new HttpLoggingInterceptor(new Slf4jRetrofitLogger(GithubService.class))
+                        .setLevel(retrofitLogLevel))
+                .build())
+        .addConverterFactory(JacksonConverterFactory.create())
+        .build()
+        .create(GithubService.class);
 
-    return githubClient;
+    //    GithubService githubClient =
+    //        new RestAdapter.Builder()
+    //            .setEndpoint(githubEndpoint)
+    //            .setConverter(new JacksonConverter())
+    //            .setClient(retrofitClient)
+    //            .setLogLevel(RestAdapter.LogLevel.FULL)
+    //            .setLog(new Slf4jRetrofitLogger(GithubService.class))
+    //            .build()
+    //            .create(GithubService.class);
+
+    //    return githubClient;
   }
 }

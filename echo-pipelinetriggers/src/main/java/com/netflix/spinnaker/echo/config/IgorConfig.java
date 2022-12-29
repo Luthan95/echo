@@ -16,50 +16,69 @@
 
 package com.netflix.spinnaker.echo.config;
 
-import com.jakewharton.retrofit.Ok3Client;
 import com.netflix.spinnaker.config.DefaultServiceEndpoint;
 import com.netflix.spinnaker.config.okhttp3.OkHttpClientProvider;
 import com.netflix.spinnaker.echo.services.IgorService;
 import com.netflix.spinnaker.okhttp.SpinnakerRequestInterceptor;
+import com.netflix.spinnaker.retrofit.RetrofitResponseInterceptor;
 import com.netflix.spinnaker.retrofit.Slf4jRetrofitLogger;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.logging.HttpLoggingInterceptor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import retrofit.Endpoint;
-import retrofit.Endpoints;
-import retrofit.RestAdapter.Builder;
-import retrofit.RestAdapter.LogLevel;
-import retrofit.converter.JacksonConverter;
+import retrofit2.Retrofit;
+import retrofit2.converter.jackson.JacksonConverterFactory;
 
 @Configuration
 @ConditionalOnProperty("igor.enabled")
 @Slf4j
 public class IgorConfig {
-  @Bean
-  public Endpoint igorEndpoint(@Value("${igor.base-url}") String igorBaseUrl) {
-    return Endpoints.newFixedEndpoint(igorBaseUrl);
-  }
+  //  @Bean
+  //  public Endpoint igorEndpoint(@Value("${igor.base-url}") String igorBaseUrl) {
+  //    return Endpoints.newFixedEndpoint(igorBaseUrl);
+  //  }
+
+  @Setter
+  @Value("${igor.base-url}")
+  private String igorBaseUrl;
 
   @Bean
   public IgorService igorService(
-      Endpoint igorEndpoint,
       OkHttpClientProvider clientProvider,
-      LogLevel retrofitLogLevel,
+      HttpLoggingInterceptor.Level retrofitLogLevel,
       SpinnakerRequestInterceptor spinnakerRequestInterceptor) {
     log.info("igor service loaded");
-    return new Builder()
-        .setEndpoint(igorEndpoint)
-        .setConverter(new JacksonConverter())
-        .setClient(
-            new Ok3Client(
-                clientProvider.getClient(
-                    new DefaultServiceEndpoint("igor", igorEndpoint.getUrl()))))
-        .setRequestInterceptor(spinnakerRequestInterceptor)
-        .setLogLevel(retrofitLogLevel)
-        .setLog(new Slf4jRetrofitLogger(IgorService.class))
+
+    return new Retrofit.Builder()
+        .baseUrl(igorBaseUrl)
+        .addConverterFactory(JacksonConverterFactory.create())
+        .client(
+            clientProvider
+                .getClient(new DefaultServiceEndpoint("igor", igorBaseUrl))
+                .newBuilder()
+                .addInterceptor(spinnakerRequestInterceptor)
+                .addInterceptor(new RetrofitResponseInterceptor())
+                .addInterceptor(
+                    new HttpLoggingInterceptor(new Slf4jRetrofitLogger(IgorService.class))
+                        .setLevel(retrofitLogLevel))
+                .build())
         .build()
         .create(IgorService.class);
+
+    //    return new Builder()
+    //        .setEndpoint(igorEndpoint)
+    //        .setConverter(new JacksonConverter())
+    //        .setClient(
+    //            new Ok3Client(
+    //                clientProvider.getClient(
+    //                    new DefaultServiceEndpoint("igor", igorEndpoint.getUrl()))))
+    //        .setRequestInterceptor(spinnakerRequestInterceptor)
+    //        .setLogLevel(retrofitLogLevel)
+    //        .setLog(new Slf4jRetrofitLogger(IgorService.class))
+    //        .build()
+    //        .create(IgorService.class);
   }
 }
